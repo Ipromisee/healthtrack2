@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HealthTrack - 健康挑战</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <div class="title">健康挑战</div>
+          <div class="subtitle"><a class="link" href="../index.html">返回主菜单</a></div>
+        </div>
+        <span class="pill" id="currentUserPill"></span>
+      </div>
+
+      <div class="panel">
+        <div class="grid">
+          <div class="col-12">
+            <div class="notice" id="notice" style="display:none;"></div>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">创建挑战</div>
+            <label>目标</label>
+            <input id="goal" placeholder="例如：一个月走 100 英里" />
+            <div style="height:10px;"></div>
+            <div class="row">
+              <div style="flex:1">
+                <label>开始日期</label>
+                <input id="startDate" type="date" />
+              </div>
+              <div style="flex:1">
+                <label>结束日期</label>
+                <input id="endDate" type="date" />
+              </div>
+            </div>
+            <div style="height:10px;"></div>
+            <button class="btn primary" id="createBtn">创建</button>
+
+            <div style="height:14px;"></div>
+            <div style="font-weight:700; margin-bottom:8px;">热门挑战（参与人数最多）</div>
+            <button class="btn" id="topBtn">刷新</button>
+            <table>
+              <thead><tr><th>挑战</th><th>参与人数</th></tr></thead>
+              <tbody id="topTbody"></tbody>
+            </table>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">挑战列表</div>
+            <div class="row">
+              <button class="btn" id="refreshBtn">刷新列表</button>
+              <button class="btn" id="toggleListBtn">切换：仅看我参与 / 查看全部</button>
+            </div>
+            <table>
+              <thead><tr><th>ID</th><th>目标</th><th>日期</th><th class="th-actions">操作</th></tr></thead>
+              <tbody id="listTbody"></tbody>
+            </table>
+
+            <div style="height:14px;"></div>
+            <div class="panel">
+              <div style="font-weight:700;">已选择挑战</div>
+              <div class="subtitle" id="selectedInfo">未选择</div>
+              <div style="height:10px;"></div>
+              <div class="row">
+                <button class="btn primary" id="joinBtn">加入</button>
+                <button class="btn" id="loadParticipantsBtn">查看参与者</button>
+              </div>
+              <div style="height:10px;"></div>
+              <table>
+                <thead><tr><th>用户</th><th>进度</th><th>是否完成</th><th class="th-actions">操作</th></tr></thead>
+                <tbody id="participantsTbody"></tbody>
+              </table>
+
+              <div style="height:14px;"></div>
+              <div style="font-weight:700; margin-bottom:8px;">发送邀请</div>
+              <div class="row">
+                <select id="recipientType">
+                  <option value="EMAIL">EMAIL</option>
+                  <option value="PHONE">PHONE</option>
+                </select>
+                <input id="recipientValue" placeholder="邮箱或手机号" />
+                <button class="btn primary" id="inviteBtn">发送</button>
+              </div>
+              <div style="height:10px;"></div>
+              <table>
+                <thead><tr><th>ID</th><th>接收方</th><th>状态</th><th>发起时间</th><th>到期时间</th></tr></thead>
+                <tbody id="invitesTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { api, getCurrentUserId } from "../assets/api.js";
+
+      const pill = document.getElementById("currentUserPill");
+      const notice = document.getElementById("notice");
+      const goal = document.getElementById("goal");
+      const startDate = document.getElementById("startDate");
+      const endDate = document.getElementById("endDate");
+      const createBtn = document.getElementById("createBtn");
+      const topBtn = document.getElementById("topBtn");
+      const topTbody = document.getElementById("topTbody");
+
+      const refreshBtn = document.getElementById("refreshBtn");
+      const toggleListBtn = document.getElementById("toggleListBtn");
+      const listTbody = document.getElementById("listTbody");
+
+      const selectedInfo = document.getElementById("selectedInfo");
+      const joinBtn = document.getElementById("joinBtn");
+      const loadParticipantsBtn = document.getElementById("loadParticipantsBtn");
+      const participantsTbody = document.getElementById("participantsTbody");
+
+      const recipientType = document.getElementById("recipientType");
+      const recipientValue = document.getElementById("recipientValue");
+      const inviteBtn = document.getElementById("inviteBtn");
+      const invitesTbody = document.getElementById("invitesTbody");
+
+      let selectedChallengeId = null;
+      let showAll = false;
+
+      function show(msg, kind) {
+        notice.style.display = "block";
+        notice.className = `notice ${kind || ""}`;
+        notice.textContent = msg;
+      }
+
+      function userIdOrRedirect() {
+        const id = getCurrentUserId();
+        if (!id) { window.location.href = "../login.html"; return null; }
+        pill.textContent = `已登录 userId：${id}`;
+        return id;
+      }
+
+      async function refreshList() {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        const list = showAll ? await api.challenge.list() : await api.challenge.my(userId);
+        listTbody.innerHTML = list.map(c => `
+          <tr>
+            <td>${c.id}</td>
+            <td>${c.goalText}</td>
+            <td>${c.startDate} → ${c.endDate}</td>
+            <td class="td-actions"><button class="btn" data-id="${c.id}" data-goal="${encodeURIComponent(c.goalText)}">选择</button></td>
+          </tr>
+        `).join("");
+        listTbody.querySelectorAll("button[data-id]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            selectedChallengeId = Number(btn.dataset.id);
+            selectedInfo.textContent = `#${selectedChallengeId} - ${decodeURIComponent(btn.dataset.goal)}`;
+            participantsTbody.innerHTML = "";
+            invitesTbody.innerHTML = "";
+          });
+        });
+      }
+
+      async function refreshTop() {
+        const rows = await api.challenge.top(5);
+        topTbody.innerHTML = rows.map(r => `
+          <tr><td>#${r.challengeId} - ${r.goalText}</td><td>${r.participantCount}</td></tr>
+        `).join("");
+      }
+
+      async function loadParticipants() {
+        if (!selectedChallengeId) return show("请先选择一个挑战。", "error");
+        const currentUserId = userIdOrRedirect();
+        if (!currentUserId) return;
+        const rows = await api.challenge.participants(selectedChallengeId);
+        participantsTbody.innerHTML = rows.map(r => `
+          <tr>
+            <td>${r.fullName} (userId=${r.userId})</td>
+            <td>${r.progressValue}</td>
+            <td>${r.isCompleted ? "是" : "否"}</td>
+            <td class="td-actions">
+              ${r.userId === currentUserId ? `<button class="btn" data-uid="${r.userId}">更新</button>` : ""}
+            </td>
+          </tr>
+        `).join("");
+        participantsTbody.querySelectorAll("button[data-uid]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const userId = Number(btn.dataset.uid);
+            const pv = prompt("请输入进度数值（数字）：", "10");
+            if (pv === null) return;
+            const isCompleted = confirm("是否标记为完成？");
+            try {
+              await api.challenge.progress({
+                challengeId: selectedChallengeId,
+                userId, // only current user has the button
+                progressValue: Number(pv),
+                isCompleted,
+              });
+              await loadParticipants();
+              show("进度已更新。", "ok");
+            } catch (e) { show(e.message, "error"); }
+          });
+        });
+      }
+
+      async function loadInvites() {
+        if (!selectedChallengeId) return;
+        const rows = await api.challenge.invitations(selectedChallengeId);
+        invitesTbody.innerHTML = rows.map(r => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.recipientType}: ${r.recipientValue}</td>
+            <td>${r.status}</td>
+            <td>${r.initiatedAt}</td>
+            <td>${r.expiresAt}</td>
+          </tr>
+        `).join("");
+      }
+
+      createBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        const payload = {
+          creatorUserId: userId,
+          goalText: goal.value.trim(),
+          startDate: startDate.value,
+          endDate: endDate.value,
+        };
+        if (!payload.goalText || !payload.startDate || !payload.endDate) return show("请填写目标与日期。", "error");
+        try {
+          const id = await api.challenge.create(payload);
+          goal.value = "";
+          await refreshList();
+          await refreshTop();
+          show(`挑战已创建（id=${id}）`, "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      refreshBtn.addEventListener("click", async () => {
+        try { await refreshList(); show("已刷新。", "ok"); } catch (e) { show(e.message, "error"); }
+      });
+
+      toggleListBtn.addEventListener("click", async () => {
+        showAll = !showAll;
+        try {
+          await refreshList();
+          show(showAll ? "已切换：当前显示全部挑战。" : "已切换：当前仅显示我参与的挑战。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+      topBtn.addEventListener("click", async () => {
+        try { await refreshTop(); show("已刷新。", "ok"); } catch (e) { show(e.message, "error"); }
+      });
+
+      joinBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        if (!selectedChallengeId) return show("请先选择一个挑战。", "error");
+        try {
+          await api.challenge.join(selectedChallengeId, userId);
+          await loadParticipants();
+          show("已加入挑战。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+      loadParticipantsBtn.addEventListener("click", async () => {
+        try { await loadParticipants(); show("已加载参与者。", "ok"); } catch (e) { show(e.message, "error"); }
+      });
+
+      inviteBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        if (!selectedChallengeId) return show("请先选择一个挑战。", "error");
+        const payload = {
+          challengeId: selectedChallengeId,
+          senderUserId: userId,
+          recipientType: recipientType.value,
+          recipientValue: recipientValue.value.trim(),
+        };
+        if (!payload.recipientValue) return show("请输入接收方邮箱或手机号。", "error");
+        try {
+          const id = await api.challenge.invite(payload);
+          recipientValue.value = "";
+          await loadInvites();
+          show(`邀请已发送（id=${id}）。`, "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      (async () => {
+        try {
+          userIdOrRedirect();
+          await refreshList();
+          await refreshTop();
+        } catch (e) { show(e.message, "error"); }
+      })();
+
+      // whenever a challenge is selected we should show invites too
+      const observer = new MutationObserver(async () => {
+        if (selectedChallengeId) {
+          try { await loadInvites(); } catch { /* ignore */ }
+        }
+      });
+      observer.observe(selectedInfo, { childList: true });
+    </script>
+  </body>
+</html>
+
+

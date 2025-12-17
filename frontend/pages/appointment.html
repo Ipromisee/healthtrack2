@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HealthTrack - 预约管理</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <div class="title">预约管理</div>
+          <div class="subtitle"><a class="link" href="../index.html">返回主菜单</a></div>
+        </div>
+        <span class="pill" id="currentUserPill"></span>
+      </div>
+
+      <div class="panel">
+        <div class="grid">
+          <div class="col-12">
+            <div class="notice" id="notice" style="display:none;"></div>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">创建预约</div>
+            <label>就诊医生/机构（仅显示已关联 Provider）</label>
+            <select id="providerSelect"></select>
+            <div style="height:10px;"></div>
+            <label>预约时间</label>
+            <input id="scheduledAt" type="datetime-local" />
+            <div style="height:10px;"></div>
+            <label>类型</label>
+            <select id="typeSelect">
+              <option value="IN_PERSON">线下</option>
+              <option value="VIRTUAL">线上</option>
+            </select>
+            <div style="height:10px;"></div>
+            <label>备注（可选）</label>
+            <textarea id="memo" placeholder="症状/问题等"></textarea>
+            <div style="height:10px;"></div>
+            <button class="btn primary" id="createBtn">创建</button>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">查询 / 取消</div>
+            <label>查询时间范围（可选）</label>
+            <div class="row">
+              <input id="start" type="datetime-local" />
+              <input id="end" type="datetime-local" />
+            </div>
+            <div style="height:10px;"></div>
+            <button class="btn" id="searchBtn">查询</button>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>Provider</th><th>时间</th><th>类型</th><th>状态</th><th>取消原因</th><th class="th-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { api, getCurrentUserId, fmtIsoLocal } from "../assets/api.js";
+
+      const pill = document.getElementById("currentUserPill");
+      const notice = document.getElementById("notice");
+      const providerSelect = document.getElementById("providerSelect");
+      const scheduledAt = document.getElementById("scheduledAt");
+      const typeSelect = document.getElementById("typeSelect");
+      const memo = document.getElementById("memo");
+      const createBtn = document.getElementById("createBtn");
+
+      const start = document.getElementById("start");
+      const end = document.getElementById("end");
+      const searchBtn = document.getElementById("searchBtn");
+      const tbody = document.getElementById("tbody");
+
+      function show(msg, kind) {
+        notice.style.display = "block";
+        notice.className = `notice ${kind || ""}`;
+        notice.textContent = msg;
+      }
+
+      function userIdOrRedirect() {
+        const id = getCurrentUserId();
+        if (!id) { window.location.href = "../login.html"; return null; }
+        pill.textContent = `已登录 userId：${id}`;
+        return id;
+      }
+
+      async function loadProviders() {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        const info = await api.account.get(userId);
+        const items = info.linkedProviders || [];
+        if (items.length === 0) {
+          providerSelect.innerHTML = "";
+          show("当前账号未关联任何 Provider，请先到“账户信息”中关联。", "error");
+          return;
+        }
+        providerSelect.innerHTML = items.map(p => `<option value="${p.id}">${p.displayName} (${p.licenseNo})</option>`).join("");
+      }
+
+      function render(rows) {
+        tbody.innerHTML = rows.map(r => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.providerName}</td>
+            <td>${r.scheduledAt}</td>
+            <td>${r.appointmentType}</td>
+            <td>${r.status}</td>
+            <td>${r.cancelReason || ""}</td>
+            <td class="td-actions">
+              ${r.status === "SCHEDULED" ? `<button class="btn danger" data-id="${r.id}">取消</button>` : ""}
+            </td>
+          </tr>
+        `).join("");
+
+        tbody.querySelectorAll("button[data-id]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = Number(btn.dataset.id);
+            const reason = prompt("请输入取消原因：", "用户改期");
+            if (!reason) return;
+            try {
+              await api.appointment.cancel({ appointmentId: id, reason });
+              await doSearch();
+              show("已取消。", "ok");
+            } catch (e) { show(e.message, "error"); }
+          });
+        });
+      }
+
+      async function doSearch() {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        const info = await api.account.get(userId);
+        const rows = await api.appointment.search({
+          healthId: info.user.healthId,
+          providerId: null,
+          appointmentType: null,
+          start: fmtIsoLocal(start.value),
+          end: fmtIsoLocal(end.value),
+        });
+        render(rows);
+      }
+
+      createBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        if (!scheduledAt.value) return show("请选择预约时间。", "error");
+        try {
+          const id = await api.appointment.create({
+            userId,
+            providerId: Number(providerSelect.value),
+            scheduledAt: fmtIsoLocal(scheduledAt.value),
+            appointmentType: typeSelect.value,
+            memo: memo.value || null,
+          });
+          memo.value = "";
+          await doSearch();
+          show(`预约已创建（id=${id}）`, "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      searchBtn.addEventListener("click", async () => {
+        try { await doSearch(); show("查询完成。", "ok"); } catch (e) { show(e.message, "error"); }
+      });
+
+      (async () => {
+        try {
+          userIdOrRedirect();
+          await loadProviders();
+          await doSearch();
+        } catch (e) {
+          show(e.message, "error");
+        }
+      })();
+    </script>
+  </body>
+</html>
+
+

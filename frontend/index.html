@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HealthTrack - 主菜单</title>
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <div class="title">HealthTrack</div>
+          <div class="subtitle">个人健康与预约管理</div>
+        </div>
+        <div class="row">
+          <span class="pill" id="currentUserPill">未登录</span>
+          <button class="btn danger" id="signOutBtn">退出登录</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="grid">
+          <div class="col-12">
+            <div style="font-weight:700; margin-bottom: 6px;">主菜单</div>
+            <div class="subtitle">请选择功能。</div>
+          </div>
+
+          <div class="col-4">
+            <a class="btn primary link" href="./pages/account.html" style="display:block; text-align:center;">账户信息</a>
+          </div>
+          <div class="col-4">
+            <a class="btn primary link" href="./pages/appointment.html" style="display:block; text-align:center;">预约管理</a>
+          </div>
+          <div class="col-4">
+            <a class="btn primary link" href="./pages/challenge.html" style="display:block; text-align:center;">健康挑战</a>
+          </div>
+          <div class="col-4">
+            <a class="btn primary link" href="./pages/family.html" style="display:block; text-align:center;">家庭</a>
+          </div>
+          <div class="col-6">
+            <a class="btn primary link" href="./pages/summary.html" style="display:block; text-align:center;">月度健康汇总</a>
+          </div>
+          <div class="col-6">
+            <a class="btn primary link" href="./pages/search.html" style="display:block; text-align:center;">查询</a>
+          </div>
+          <div class="col-12">
+            <a class="btn link" href="./pages/health_record.html" style="display:block; text-align:center;">新增健康记录</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { getCurrentUserId, clearCurrentUser } from "./assets/api.js";
+
+      const currentUserPill = document.getElementById("currentUserPill");
+      const signOutBtn = document.getElementById("signOutBtn");
+
+      function refreshPill() {
+        const id = getCurrentUserId();
+        currentUserPill.textContent = id ? `已登录 userId：${id}` : "未登录";
+      }
+
+      const id = getCurrentUserId();
+      if (!id) {
+        window.location.href = "./login.html";
+      } else {
+        refreshPill();
+      }
+
+      signOutBtn.addEventListener("click", () => {
+        clearCurrentUser();
+        window.location.href = "./login.html";
+      });
+    </script>
+  </body>
+</html>
+
+

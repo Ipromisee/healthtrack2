@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HealthTrack - 查询</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <div class="title">查询</div>
+          <div class="subtitle"><a class="link" href="../index.html">返回主菜单</a></div>
+        </div>
+        <span class="pill" id="currentUserPill"></span>
+      </div>
+
+      <div class="panel">
+        <div class="grid">
+          <div class="col-12">
+            <div class="notice" id="notice" style="display:none;"></div>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">查询预约</div>
+            <label>Provider（可选）</label>
+            <select id="providerSelect"><option value="">(any)</option></select>
+            <div style="height:10px;"></div>
+            <label>预约类型（可选）</label>
+            <select id="apptType">
+              <option value="">（不限）</option>
+              <option value="IN_PERSON">线下</option>
+              <option value="VIRTUAL">线上</option>
+            </select>
+            <div style="height:10px;"></div>
+            <label>时间范围（可选）</label>
+            <div class="row">
+              <input id="apptStart" type="datetime-local" />
+              <input id="apptEnd" type="datetime-local" />
+            </div>
+            <div style="height:10px;"></div>
+            <button class="btn primary" id="apptSearchBtn">查询</button>
+            <table>
+              <thead><tr><th>ID</th><th>Provider</th><th>时间</th><th>类型</th><th>状态</th></tr></thead>
+              <tbody id="apptTbody"></tbody>
+            </table>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">查询健康记录</div>
+            <label>指标（可选）</label>
+            <select id="metricCode"></select>
+            <div style="height:10px;"></div>
+            <label>时间范围（可选）</label>
+            <div class="row">
+              <input id="hrStart" type="datetime-local" />
+              <input id="hrEnd" type="datetime-local" />
+            </div>
+            <div style="height:10px;"></div>
+            <button class="btn primary" id="hrSearchBtn">查询</button>
+            <table>
+              <thead><tr><th>指标</th><th>数值</th><th>时间</th><th>备注</th></tr></thead>
+              <tbody id="hrTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { api, getCurrentUserId, fmtIsoLocal } from "../assets/api.js";
+
+      const pill = document.getElementById("currentUserPill");
+      const notice = document.getElementById("notice");
+
+      const providerSelect = document.getElementById("providerSelect");
+      const apptType = document.getElementById("apptType");
+      const apptStart = document.getElementById("apptStart");
+      const apptEnd = document.getElementById("apptEnd");
+      const apptSearchBtn = document.getElementById("apptSearchBtn");
+      const apptTbody = document.getElementById("apptTbody");
+
+      const metricCode = document.getElementById("metricCode");
+      const hrStart = document.getElementById("hrStart");
+      const hrEnd = document.getElementById("hrEnd");
+      const hrSearchBtn = document.getElementById("hrSearchBtn");
+      const hrTbody = document.getElementById("hrTbody");
+
+      function show(msg, kind) {
+        notice.style.display = "block";
+        notice.className = `notice ${kind || ""}`;
+        notice.textContent = msg;
+      }
+
+      function userIdOrRedirect() {
+        const id = getCurrentUserId();
+        if (!id) { window.location.href = "../login.html"; return null; }
+        pill.textContent = `已登录 userId：${id}`;
+        return id;
+      }
+
+      async function loadProviders() {
+        const items = await api.account.providers();
+        providerSelect.innerHTML = `<option value="">（不限）</option>` +
+          items.map(p => `<option value="${p.id}">${p.displayName}</option>`).join("");
+      }
+
+      async function loadMetricTypesForSearch() {
+        const res = await api.healthRecord.metricTypes();
+        const items = res.items || [];
+        metricCode.innerHTML =
+          `<option value="">（不限）</option>` +
+          items.map(m => `<option value="${m.code}">${m.displayName}</option>`).join("");
+      }
+
+      apptSearchBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          const info = await api.account.get(userId);
+          const rows = await api.appointment.search({
+            healthId: info.user.healthId,
+            providerId: providerSelect.value ? Number(providerSelect.value) : null,
+            appointmentType: apptType.value || null,
+            start: fmtIsoLocal(apptStart.value),
+            end: fmtIsoLocal(apptEnd.value),
+          });
+          apptTbody.innerHTML = rows.map(r => `
+            <tr><td>${r.id}</td><td>${r.providerName}</td><td>${r.scheduledAt}</td><td>${r.appointmentType}</td><td>${r.status}</td></tr>
+          `).join("");
+          show("预约查询完成。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      hrSearchBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          const info = await api.account.get(userId);
+          const rows = await api.search.healthRecords({
+            healthId: info.user.healthId,
+            metricCode: metricCode.value || null,
+            start: fmtIsoLocal(hrStart.value),
+            end: fmtIsoLocal(hrEnd.value),
+          });
+          hrTbody.innerHTML = rows.map(r => `
+            <tr>
+              <td>${r.metricName || r.metricCode}</td>
+              <td>${r.value} ${r.unit || ""}</td>
+              <td>${r.recordedAt}</td>
+              <td>${r.note || ""}</td>
+            </tr>
+          `).join("");
+          show("健康记录查询完成。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+
+      (async () => {
+        try {
+          userIdOrRedirect();
+          await loadProviders();
+          await loadMetricTypesForSearch();
+        } catch (e) { show(e.message, "error"); }
+      })();
+    </script>
+  </body>
+</html>
+
+

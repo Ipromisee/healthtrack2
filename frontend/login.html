@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HealthTrack - 登录 / 注册</title>
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <div class="title">HealthTrack</div>
+          <div class="subtitle">请选择登录身份</div>
+        </div>
+        <span class="pill" id="currentUserPill">未登录</span>
+      </div>
+
+      <div class="panel">
+        <div class="grid">
+          <div class="col-12">
+            <div style="font-weight:700;">登录</div>
+            <div class="subtitle">用户与 Provider 使用不同登录入口。</div>
+          </div>
+          <div class="col-6">
+            <label>用户登录（使用已有 userId）</label>
+            <div class="row">
+              <input id="userIdInput" type="number" min="1" placeholder="例如：1" />
+              <button class="btn primary" id="useUserBtn">登录</button>
+            </div>
+            <div class="notice" id="userNotice" style="display:none;"></div>
+            <div class="subtitle" style="margin-top:8px;">家庭成员登录：在“家庭”页面可看到成员的 userId，回到这里输入该 userId 即可登录该成员账号。</div>
+          </div>
+
+          <div class="col-6">
+            <label>Provider 登录（license_no + 登录码）</label>
+            <div class="grid">
+              <div class="col-6"><input id="providerLicense" placeholder="例如：LIC-10001" /></div>
+              <div class="col-6"><input id="providerCode" placeholder="登录码（默认：provider123）" /></div>
+              <div class="col-12">
+                <button class="btn primary" id="providerLoginBtn">登录（Provider）</button>
+              </div>
+            </div>
+            <div class="notice" id="providerNotice" style="display:none;"></div>
+          </div>
+
+          <div class="col-12" style="height: 10px;"></div>
+
+          <div class="col-12">
+            <div style="font-weight:700;">注册</div>
+            <div class="subtitle">创建新账号后会自动登录。</div>
+          </div>
+          <div class="col-6">
+            <label>Health ID（唯一）</label>
+            <input id="newHealthId" placeholder="例如：H-0100" />
+          </div>
+          <div class="col-6">
+            <label>姓名</label>
+            <input id="newFullName" placeholder="例如：张三" />
+          </div>
+          <div class="col-6">
+            <label>邮箱</label>
+            <input id="newEmail" placeholder="例如：name@example.com" />
+          </div>
+          <div class="col-6">
+            <label>手机号</label>
+            <input id="newPhone" placeholder="例如：555-1001" />
+          </div>
+          <div class="col-12">
+            <button class="btn primary" id="createUserBtn">注册并登录</button>
+            <div class="notice" id="createNotice" style="display:none; margin-top:10px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { api, getCurrentUserId, getCurrentProviderId, setCurrentUserId, setCurrentProviderId } from "./assets/api.js";
+
+      const currentUserPill = document.getElementById("currentUserPill");
+      const userIdInput = document.getElementById("userIdInput");
+      const useUserBtn = document.getElementById("useUserBtn");
+      const userNotice = document.getElementById("userNotice");
+
+      const providerLicense = document.getElementById("providerLicense");
+      const providerCode = document.getElementById("providerCode");
+      const providerLoginBtn = document.getElementById("providerLoginBtn");
+      const providerNotice = document.getElementById("providerNotice");
+
+      const createUserBtn = document.getElementById("createUserBtn");
+      const createNotice = document.getElementById("createNotice");
+      const newHealthId = document.getElementById("newHealthId");
+      const newFullName = document.getElementById("newFullName");
+      const newEmail = document.getElementById("newEmail");
+      const newPhone = document.getElementById("newPhone");
+
+      function showNotice(el, msg, kind) {
+        el.style.display = "block";
+        el.className = `notice ${kind || ""}`;
+        el.textContent = msg;
+      }
+
+      function refreshPill() {
+        const uid = getCurrentUserId();
+        const pid = getCurrentProviderId();
+        if (uid) currentUserPill.textContent = `已登录：用户（userId=${uid}）`;
+        else if (pid) currentUserPill.textContent = `已登录：Provider（providerId=${pid}）`;
+        else currentUserPill.textContent = "未登录";
+      }
+
+      refreshPill();
+
+      function goHome() {
+        window.location.href = "./index.html";
+      }
+
+      function goProviderHome() {
+        window.location.href = "./provider.html";
+      }
+
+      useUserBtn.addEventListener("click", async () => {
+        userNotice.style.display = "none";
+        const userId = Number(userIdInput.value);
+        if (!userId) return showNotice(userNotice, "请输入有效的 userId。", "error");
+        try {
+          const info = await api.account.get(userId);
+          setCurrentUserId(userId);
+          refreshPill();
+          showNotice(userNotice, `登录成功：${info.user.fullName}（${info.user.healthId}）`, "ok");
+          setTimeout(goHome, 400);
+        } catch (e) {
+          showNotice(userNotice, e.message || "登录失败", "error");
+        }
+      });
+
+      providerLoginBtn.addEventListener("click", async () => {
+        providerNotice.style.display = "none";
+        const payload = {
+          licenseNo: providerLicense.value.trim(),
+          loginCode: providerCode.value.trim() || "provider123",
+        };
+        if (!payload.licenseNo || !payload.loginCode) return showNotice(providerNotice, "请输入 license_no 与登录码。", "error");
+        try {
+          const res = await api.provider.login(payload);
+          setCurrentProviderId(res.providerId);
+          refreshPill();
+          showNotice(providerNotice, `登录成功：${res.displayName}（${res.licenseNo}）`, "ok");
+          setTimeout(goProviderHome, 400);
+        } catch (e) {
+          showNotice(providerNotice, e.message || "登录失败", "error");
+        }
+      });
+
+      createUserBtn.addEventListener("click", async () => {
+        createNotice.style.display = "none";
+        const payload = {
+          healthId: newHealthId.value.trim(),
+          fullName: newFullName.value.trim(),
+          email: newEmail.value.trim(),
+          phone: newPhone.value.trim(),
+        };
+        if (!payload.healthId || !payload.fullName || !payload.email || !payload.phone) {
+          return showNotice(createNotice, "请完整填写注册信息。", "error");
+        }
+        try {
+          const u = await api.account.create(payload);
+          setCurrentUserId(u.id);
+          refreshPill();
+          showNotice(createNotice, `注册成功，已登录（userId=${u.id}）。`, "ok");
+          setTimeout(goHome, 400);
+        } catch (e) {
+          showNotice(createNotice, e.message || "注册失败", "error");
+        }
+      });
+    </script>
+  </body>
+</html>
+
+
+

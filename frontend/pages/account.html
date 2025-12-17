@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HealthTrack - 账户信息</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <div class="title">账户信息</div>
+          <div class="subtitle"><a class="link" href="../index.html">返回主菜单</a></div>
+        </div>
+        <span class="pill" id="currentUserPill"></span>
+      </div>
+
+      <div class="panel">
+        <div class="grid">
+          <div class="col-12 row" style="justify-content: space-between;">
+            <div style="font-weight:700;">当前账户</div>
+            <button class="btn" id="refreshBtn">刷新</button>
+          </div>
+          <div class="col-12">
+            <div class="notice" id="notice" style="display:none;"></div>
+          </div>
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">个人信息</div>
+            <label>姓名</label>
+            <input id="fullName" />
+            <div style="height:10px;"></div>
+            <button class="btn primary" id="saveNameBtn">保存</button>
+          </div>
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">手机号</div>
+            <label>手机号</label>
+            <input id="phone" placeholder="例如：555-1001" />
+            <div style="height:10px;"></div>
+            <div class="row">
+              <button class="btn primary" id="savePhoneBtn">新增/更新</button>
+              <button class="btn danger" id="removePhoneBtn">删除</button>
+            </div>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">邮箱</div>
+            <label>新增邮箱</label>
+            <div class="row">
+              <input id="newEmail" placeholder="email@example.com" />
+              <button class="btn primary" id="addEmailBtn">新增</button>
+            </div>
+            <table>
+              <thead><tr><th>Email</th><th>是否已验证</th><th class="th-actions">操作</th></tr></thead>
+              <tbody id="emailsTbody"></tbody>
+            </table>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">关联 Provider</div>
+            <label>关联 Provider</label>
+            <div class="row">
+              <select id="providerSelect"></select>
+              <button class="btn primary" id="linkProviderBtn">关联</button>
+            </div>
+            <div style="height:10px;"></div>
+            <label>设置主治（Primary Care）</label>
+            <div class="row">
+              <select id="primarySelect"></select>
+              <button class="btn primary" id="setPrimaryBtn">设置</button>
+              <button class="btn danger" id="clearPrimaryBtn">清除</button>
+            </div>
+            <table>
+              <thead><tr><th>Provider</th><th>科室</th><th>是否已验证</th><th class="th-actions">操作</th></tr></thead>
+              <tbody id="providersTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { api, getCurrentUserId } from "../assets/api.js";
+
+      const pill = document.getElementById("currentUserPill");
+      const notice = document.getElementById("notice");
+      const refreshBtn = document.getElementById("refreshBtn");
+
+      const fullName = document.getElementById("fullName");
+      const saveNameBtn = document.getElementById("saveNameBtn");
+
+      const phone = document.getElementById("phone");
+      const savePhoneBtn = document.getElementById("savePhoneBtn");
+      const removePhoneBtn = document.getElementById("removePhoneBtn");
+
+      const newEmail = document.getElementById("newEmail");
+      const addEmailBtn = document.getElementById("addEmailBtn");
+      const emailsTbody = document.getElementById("emailsTbody");
+
+      const providerSelect = document.getElementById("providerSelect");
+      const linkProviderBtn = document.getElementById("linkProviderBtn");
+      const providersTbody = document.getElementById("providersTbody");
+      const primarySelect = document.getElementById("primarySelect");
+      const setPrimaryBtn = document.getElementById("setPrimaryBtn");
+      const clearPrimaryBtn = document.getElementById("clearPrimaryBtn");
+
+      function show(msg, kind) {
+        notice.style.display = "block";
+        notice.className = `notice ${kind || ""}`;
+        notice.textContent = msg;
+      }
+
+      function userIdOrRedirect() {
+        const id = getCurrentUserId();
+        if (!id) {
+          window.location.href = "../login.html";
+          return null;
+        }
+        pill.textContent = `已登录 userId：${id}`;
+        return id;
+      }
+
+      async function loadProviders() {
+        const items = await api.account.providers();
+        providerSelect.innerHTML = items.map(p => `<option value="${p.id}">${p.displayName} (${p.licenseNo})</option>`).join("");
+      }
+
+      function renderEmails(emails, userId) {
+        emailsTbody.innerHTML = emails.map(e => `
+          <tr>
+            <td>${e.email}</td>
+            <td>${e.isVerified ? "是" : "否"}</td>
+            <td class="td-actions"><button class="btn danger" data-email="${e.email}">删除</button></td>
+          </tr>
+        `).join("");
+        emailsTbody.querySelectorAll("button[data-email]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            try {
+              await api.account.removeEmail({ userId, email: btn.dataset.email });
+              await refresh();
+              show("邮箱已删除。", "ok");
+            } catch (e) { show(e.message, "error"); }
+          });
+        });
+      }
+
+      function renderProviders(linkedProviders, userId, primaryProviderId) {
+        providersTbody.innerHTML = linkedProviders.map(p => `
+          <tr>
+            <td>${p.displayName}</td>
+            <td>${p.specialty || ""}</td>
+            <td>${p.isVerified ? "是" : "否"}</td>
+            <td class="td-actions"><button class="btn danger" data-pid="${p.id}">解绑</button></td>
+          </tr>
+        `).join("");
+        providersTbody.querySelectorAll("button[data-pid]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            try {
+              await api.account.unlinkProvider({ userId, providerId: Number(btn.dataset.pid) });
+              await refresh();
+              show("已解绑 Provider。", "ok");
+            } catch (e) { show(e.message, "error"); }
+          });
+        });
+
+        primarySelect.innerHTML =
+          [`<option value="">（请选择）</option>`]
+          .concat(linkedProviders.map(p => `<option value="${p.id}" ${primaryProviderId === p.id ? "selected" : ""}>${p.displayName}</option>`))
+          .join("");
+      }
+
+      async function refresh() {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        const info = await api.account.get(userId);
+        fullName.value = info.user.fullName;
+        phone.value = info.phone?.phone || "";
+        renderEmails(info.emails || [], userId);
+        renderProviders(info.linkedProviders || [], userId, info.user.primaryProviderId);
+      }
+
+      refreshBtn.addEventListener("click", async () => {
+        try { await refresh(); show("已刷新。", "ok"); } catch (e) { show(e.message, "error"); }
+      });
+
+      saveNameBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          await api.account.update({ userId, fullName: fullName.value.trim() });
+          await refresh();
+          show("已保存。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      savePhoneBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          await api.account.upsertPhone({ userId, phone: phone.value.trim() });
+          await refresh();
+          show("手机号已更新。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      removePhoneBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          await api.account.removePhone({ userId });
+          await refresh();
+          show("手机号已删除。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      addEmailBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          await api.account.addEmail({ userId, email: newEmail.value.trim().toLowerCase() });
+          newEmail.value = "";
+          await refresh();
+          show("邮箱已新增。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      linkProviderBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          await api.account.linkProvider({ userId, providerId: Number(providerSelect.value) });
+          await refresh();
+          show("已关联 Provider。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      setPrimaryBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          const pid = primarySelect.value ? Number(primarySelect.value) : null;
+          await api.account.setPrimary({ userId, providerId: pid });
+          await refresh();
+          show("主治 Provider 已更新。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      clearPrimaryBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        try {
+          await api.account.setPrimary({ userId, providerId: null });
+          await refresh();
+          show("主治 Provider 已清除。", "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      (async () => {
+        try {
+          userIdOrRedirect();
+          await loadProviders();
+          await refresh();
+        } catch (e) {
+          show(e.message, "error");
+        }
+      })();
+    </script>
+  </body>
+</html>
+
+

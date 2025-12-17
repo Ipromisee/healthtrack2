@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HealthTrack - 月度健康汇总</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <div class="title">月度健康汇总</div>
+          <div class="subtitle"><a class="link" href="../index.html">返回主菜单</a></div>
+        </div>
+        <span class="pill" id="currentUserPill"></span>
+      </div>
+
+      <div class="panel">
+        <div class="grid">
+          <div class="col-12">
+            <div class="notice" id="notice" style="display:none;"></div>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">预约总数（按日期范围）</div>
+            <div class="row">
+              <div style="flex:1">
+                <label>开始日期</label>
+                <input id="rangeStart" type="date" />
+              </div>
+              <div style="flex:1">
+                <label>结束日期</label>
+                <input id="rangeEnd" type="date" />
+              </div>
+            </div>
+            <div style="height:10px;"></div>
+            <button class="btn primary" id="countBtn">计算</button>
+            <div class="notice" id="countOut" style="display:none;"></div>
+          </div>
+
+          <div class="col-6">
+            <div style="font-weight:700; margin-bottom:8px;">指标统计（按月 avg/min/max）</div>
+            <label>指标</label>
+            <select id="metricCode"></select>
+            <div style="height:10px;"></div>
+            <label>月份（选择该月任意一天）</label>
+            <input id="monthPick" type="date" />
+            <div style="height:10px;"></div>
+            <button class="btn primary" id="metricBtn">计算</button>
+            <div class="notice" id="metricOut" style="display:none;"></div>
+          </div>
+
+          <div class="col-12">
+            <div style="font-weight:700; margin: 6px 0;">最活跃用户</div>
+            <button class="btn" id="activeBtn">刷新</button>
+            <table>
+              <thead><tr><th>用户</th><th>健康记录数</th><th>完成挑战数</th></tr></thead>
+              <tbody id="activeTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { api, getCurrentUserId } from "../assets/api.js";
+
+      const pill = document.getElementById("currentUserPill");
+      const notice = document.getElementById("notice");
+
+      const rangeStart = document.getElementById("rangeStart");
+      const rangeEnd = document.getElementById("rangeEnd");
+      const countBtn = document.getElementById("countBtn");
+      const countOut = document.getElementById("countOut");
+
+      const metricCode = document.getElementById("metricCode");
+      const monthPick = document.getElementById("monthPick");
+      const metricBtn = document.getElementById("metricBtn");
+      const metricOut = document.getElementById("metricOut");
+
+      const activeBtn = document.getElementById("activeBtn");
+      const activeTbody = document.getElementById("activeTbody");
+
+      function show(msg, kind) {
+        notice.style.display = "block";
+        notice.className = `notice ${kind || ""}`;
+        notice.textContent = msg;
+      }
+
+      function userIdOrRedirect() {
+        const id = getCurrentUserId();
+        if (!id) { window.location.href = "../login.html"; return null; }
+        pill.textContent = `已登录 userId：${id}`;
+        return id;
+      }
+
+      async function loadMetricTypesForSummary() {
+        const res = await api.healthRecord.metricTypes();
+        const items = res.items || [];
+        metricCode.innerHTML = items.map(m => `<option value="${m.code}">${m.displayName}</option>`).join("");
+      }
+
+      function showBox(el, msg, kind) {
+        el.style.display = "block";
+        el.className = `notice ${kind || ""}`;
+        el.textContent = msg;
+      }
+
+      function monthBounds(d) {
+        const dt = new Date(d + "T00:00:00");
+        const y = dt.getFullYear();
+        const m = dt.getMonth();
+        const start = new Date(y, m, 1);
+        const end = new Date(y, m + 1, 0);
+        const fmt = (x) => x.toISOString().slice(0, 10);
+        return { start: fmt(start), end: fmt(end) };
+      }
+
+      countBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        if (!rangeStart.value || !rangeEnd.value) return show("请选择开始/结束日期。", "error");
+        try {
+          const res = await api.summary.appointmentCount({ userId, startDate: rangeStart.value, endDate: rangeEnd.value });
+          showBox(countOut, `预约总数：${res.count}`, "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      metricBtn.addEventListener("click", async () => {
+        const userId = userIdOrRedirect();
+        if (!userId) return;
+        if (!monthPick.value) return show("请选择月份（该月任意日期）。", "error");
+        const b = monthBounds(monthPick.value);
+        try {
+          const res = await api.summary.metricStats({
+            userId,
+            metricCode: metricCode.value,
+            monthStart: b.start,
+            monthEnd: b.end,
+          });
+          showBox(metricOut, `平均：${res.avgValue ?? "无"}  最小：${res.minValue ?? "无"}  最大：${res.maxValue ?? "无"}`, "ok");
+        } catch (e) { show(e.message, "error"); }
+      });
+
+      async function refreshActive() {
+        const rows = await api.summary.topActiveUsers(5);
+        activeTbody.innerHTML = rows.items.map(r => `
+          <tr>
+            <td>${r.fullName} (userId=${r.userId})</td>
+            <td>${r.recordCount}</td>
+            <td>${r.completedChallenges}</td>
+          </tr>
+        `).join("");
+      }
+
+      activeBtn.addEventListener("click", async () => {
+        try { await refreshActive(); show("已刷新。", "ok"); } catch (e) { show(e.message, "error"); }
+      });
+
+      (async () => {
+        try {
+          userIdOrRedirect();
+          await loadMetricTypesForSummary();
+          await refreshActive();
+        } catch (e) { show(e.message, "error"); }
+      })();
+    </script>
+  </body>
+</html>
+
+
