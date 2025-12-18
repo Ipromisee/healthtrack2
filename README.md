@@ -39,9 +39,10 @@
   - `src/main/resources/application.properties`：MySQL 连接配置
 - `frontend/`：静态前端（HTML/CSS/JS，通过 `fetch` 调用后端 API）
   - `assets/api.js`：API 封装，默认后端地址 `http://localhost:8080/api`
-- `docs/`
-  - `project_deliverable_3_report.md`：Phase 3 报告草稿
-  - `demo_checklist.md`：截图/演示清单
+- `docs/`（详见 `docs/README.md`）
+  - 规范/报告：`Requirement/project_deliverable_1.md`、`Requirement/project_deliverable_2.md`、`Requirement/project_deliverable_3.md`、`Requirement/project_description.md`、`Final-Report.md`
+  - 设计/演示：`code_overview.md`、`feature_manual_detailed.md`、`demo_playbook.md`
+  - 运行/提交辅助（Detail）：`Detail/api_reference.md`、`Detail/db_schema_detail.md`、`Detail/seed_data_overview.md`、`Detail/run_and_troubleshoot.md`、`Detail/screenshots_guide.md`、`Detail/curl_samples.sh`
 
 ---
 
@@ -54,54 +55,29 @@
 
 ---
 
-## 如何运行（推荐顺序）
+## 运行方式
 
-### 1) 启动 MySQL 并执行建表
-
-在 MySQL 客户端中执行：
-- `sql/01_schema.sql`
-
-它会创建数据库 `healthtrack` 并创建全部表。
-
-### 2) 导入造数数据
-
-继续执行：
-- `sql/02_seed.sql`
-
-> 该脚本会 `TRUNCATE` 各表并重新插入数据（便于重复演示）。
-
-### 3) 配置后端数据库密码
-
-编辑：
-- `backend/src/main/resources/application.properties`
-
-把下面这一行改成你本机 root 密码：
-- `spring.datasource.password=CHANGE_ME`
-
-### 4) 启动后端（Spring Boot）
-
-在项目根目录下进入 `backend/` 后运行：
+### 快速一键（推荐）
 
 ```bash
-cd backend
-mvn spring-boot:run
+cd /work/healthtrack2
+./scripts/install.sh          # 安装依赖、启动 MySQL、建库+造数、生成 .env.local、预热 Maven
+./scripts/start.sh --frontend # 启动后端，顺便用 python 起静态前端（默认 4173）
 ```
 
-默认监听端口：
-- `http://localhost:8080`
+入口：
+- 前端：`http://localhost:4173/login.html`（或直接打开 `frontend/login.html`）
+- 后端：`http://localhost:8080/api`
 
-### 5) 打开前端 GUI
+登录：
+- 用户：`userId=1..6`（或新注册）
+- Provider：`license_no=LIC-10001..10004`，登录码 `provider123`
 
-直接用浏览器打开：
-- `frontend/login.html`
-
-登录方式：
-- **用户登录**：输入 seed `userId=1..6`（或注册新用户）
-- **Provider 登录**：输入 `license_no`（如 `LIC-10001`）与登录码（默认 `provider123`）
-
-登录成功后会跳转到：
-- 用户：`frontend/index.html`（主菜单）
-- Provider：`frontend/provider.html`（Provider 门户）
+### 手动运行
+1) MySQL 执行 `sql/01_schema.sql` → `sql/02_seed.sql`  
+2) 配置 `backend/src/main/resources/application.properties` 或 `scripts/.env.local`（数据库密码等）  
+3) `cd backend && mvn spring-boot:run`（默认端口 8080）  
+4) 打开 `frontend/login.html` 或使用 `./scripts/start.sh --frontend`
 
 ---
 
@@ -113,8 +89,10 @@ mvn spring-boot:run
 - **Challenge**：创建挑战 → Select → Join → 更新 progress → Invite EMAIL/PHONE → 查看 invitations
 - **Summary/Search**：选择一个月份和 metric（如 `steps`）查看 avg/min/max；搜索预约/健康记录
 
-详细截图清单见：
-- `docs/demo_checklist.md`
+更多演示提示：
+- 演示步骤：`docs/demo_playbook.md`
+- 全功能 + 示例：`docs/feature_manual_detailed.md`
+- 运行/排障：`docs/Detail/run_and_troubleshoot.md`
 
 ---
 
@@ -132,4 +110,12 @@ mvn spring-boot:run
 - **取消预约失败**
   - 系统规定：**预约开始前 24 小时内不可取消**（后端会返回错误信息）
 
+- **容器/无 sudo**
+  - 脚本已支持 root 直接执行；必要时手动 `service mysql start`
 
+---
+
+## 关键文档
+- 规范/报告：`docs/Requirement/project_deliverable_*.md`、`docs/Requirement/project_description.md`、`docs/Final-Report.md`
+- 设计/演示：`docs/code_overview.md`、`docs/feature_manual_detailed.md`、`docs/demo_playbook.md`
+- 运行/提交辅助：`docs/Detail/api_reference.md`、`docs/Detail/db_schema_detail.md`、`docs/Detail/seed_data_overview.md`、`docs/Detail/run_and_troubleshoot.md`、`docs/Detail/screenshots_guide.md`、`docs/Detail/curl_samples.sh`
