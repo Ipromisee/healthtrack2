@@ -3,6 +3,7 @@ package edu.assignment3.healthtrack.service;
 import edu.assignment3.healthtrack.dto.FamilyDtos;
 import edu.assignment3.healthtrack.repo.FamilyRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -33,6 +34,30 @@ public class FamilyService {
     }
     return new FamilyDtos.MemberChallengeListResponse(repo.listChallengesForUser(targetUserId));
   }
+
+  @Transactional
+  public void addMember(FamilyDtos.AddMemberRequest req) {
+    // actor must be OWNER in that group (as requested)
+    FamilyRepository.MemberAuth auth = repo.getMemberAuth(req.actorUserId(), req.familyGroupId());
+    if (auth == null) throw new IllegalArgumentException("无权限：你不是该家庭组成员。");
+    if (!"OWNER".equalsIgnoreCase(auth.memberRole())) {
+      throw new IllegalArgumentException("无权限：仅家庭组 OWNER 可以拉入新成员。");
+    }
+    if (!repo.userExists(req.targetUserId())) {
+      throw new IllegalArgumentException("要添加的用户不存在（userId=" + req.targetUserId() + "）。");
+    }
+    if (repo.isMember(req.targetUserId(), req.familyGroupId())) {
+      throw new IllegalArgumentException("该用户已在家庭组中。");
+    }
+    String role = (req.memberRole() == null || req.memberRole().isBlank()) ? "MEMBER" : req.memberRole().trim().toUpperCase();
+    if (!role.equals("MEMBER") && !role.equals("MANAGER")) {
+      // prevent creating another OWNER via UI
+      role = "MEMBER";
+    }
+    boolean canManage = req.canManage() != null && req.canManage();
+    repo.addMember(req.familyGroupId(), req.targetUserId(), role, canManage);
+  }
 }
+
 
 

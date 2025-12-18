@@ -23,39 +23,98 @@
           </div>
 
           <div class="col-5">
-            <div style="font-weight:700; margin-bottom:8px;">我的家庭成员</div>
-            <div class="subtitle">提示：要“登录家庭成员账号”，请在登录页输入该成员的 userId。</div>
-            <div style="height:10px;"></div>
-            <button class="btn" id="refreshBtn">刷新成员列表</button>
-            <table>
-              <thead><tr><th>成员</th><th>组</th><th class="th-actions">操作</th></tr></thead>
-              <tbody id="memberTbody"></tbody>
-            </table>
+            <div class="panel compact">
+              <div class="row" style="justify-content: space-between;">
+                <div>
+                  <div class="section-title">家庭组</div>
+                  <div class="muted">提示：要“登录家庭成员账号”，请在登录页输入该成员的 userId。</div>
+                </div>
+                <button class="btn" id="refreshBtn">刷新</button>
+              </div>
+
+              <div style="height:10px;"></div>
+              <label>选择家庭组</label>
+              <select id="groupSelect"></select>
+              <div class="muted" id="roleHint" style="margin-top:8px;"></div>
+
+              <div style="height:14px;"></div>
+              <div class="row" style="justify-content: space-between;">
+                <div class="section-title" style="margin:0;">成员列表</div>
+                <span class="pill" id="memberCountPill">0 人</span>
+              </div>
+              <div style="height:8px;"></div>
+              <label>搜索成员</label>
+              <input id="memberFilter" placeholder="输入姓名或 userId" />
+              <table>
+                <thead><tr><th>成员</th><th class="th-actions">操作</th></tr></thead>
+                <tbody id="memberTbody"></tbody>
+              </table>
+
+              <div style="height:14px;"></div>
+              <div class="section-title">拉入新成员（仅 OWNER）</div>
+              <div class="grid">
+                <div class="col-6">
+                  <label>新成员 userId</label>
+                  <input id="addUserId" type="number" min="1" placeholder="例如：3" />
+                </div>
+                <div class="col-6">
+                  <label>角色</label>
+                  <select id="addRole">
+                    <option value="MEMBER">成员</option>
+                    <option value="MANAGER">管理员</option>
+                  </select>
+                </div>
+                <div class="col-12 row">
+                  <label style="margin:0;">
+                    <input id="addCanManage" type="checkbox" />
+                    允许管理（can_manage）
+                  </label>
+                </div>
+                <div class="col-12">
+                  <button class="btn primary" id="addBtn">添加成员</button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="col-7">
-            <div style="font-weight:700; margin-bottom:8px;">成员状况与挑战</div>
-            <div class="subtitle" id="targetHint">请选择一位家庭成员。</div>
+            <div class="panel compact">
+              <div class="row" style="justify-content: space-between;">
+                <div>
+                  <div class="section-title" style="margin:0;">成员状况</div>
+                  <div class="muted" id="targetHint">请选择一位家庭成员。</div>
+                </div>
+                <div class="tabs" role="tablist" aria-label="memberTabs">
+                  <div class="tab active" id="tabHealth">健康记录</div>
+                  <div class="tab" id="tabChallenge">挑战</div>
+                </div>
+              </div>
 
-            <div style="height:10px;"></div>
-            <div class="row">
-              <button class="btn primary" id="loadHealthBtn">查看健康记录</button>
-              <button class="btn primary" id="loadChallengeBtn">查看挑战</button>
+              <div style="height:12px;"></div>
+              <div id="healthPanel">
+                <div class="row" style="justify-content: space-between;">
+                  <div class="section-title" style="margin:0;">最近健康记录</div>
+                  <button class="btn primary" id="loadHealthBtn">刷新</button>
+                </div>
+                <div class="muted" id="healthHint" style="margin-top:6px;">选择成员后将自动加载。</div>
+              <table>
+                <thead><tr><th>指标</th><th>数值</th><th>时间</th><th>备注</th></tr></thead>
+                <tbody id="healthTbody"></tbody>
+              </table>
+              </div>
+
+              <div id="challengePanel" style="display:none;">
+                <div class="row" style="justify-content: space-between;">
+                  <div class="section-title" style="margin:0;">参与的挑战</div>
+                  <button class="btn primary" id="loadChallengeBtn">刷新</button>
+                </div>
+                <div class="muted" id="challengeHint" style="margin-top:6px;">选择成员后将自动加载。</div>
+              <table>
+                <thead><tr><th>目标</th><th>日期</th><th>进度</th><th>完成</th></tr></thead>
+                <tbody id="challengeTbody"></tbody>
+              </table>
+              </div>
             </div>
-
-            <div style="height:14px;"></div>
-            <div style="font-weight:700;">健康记录（最近）</div>
-            <table>
-              <thead><tr><th>指标</th><th>数值</th><th>时间</th><th>备注</th></tr></thead>
-              <tbody id="healthTbody"></tbody>
-            </table>
-
-            <div style="height:14px;"></div>
-            <div style="font-weight:700;">挑战（参与情况）</div>
-            <table>
-              <thead><tr><th>目标</th><th>日期</th><th>进度</th><th>完成</th></tr></thead>
-              <tbody id="challengeTbody"></tbody>
-            </table>
           </div>
         </div>
       </div>
@@ -68,14 +127,32 @@
       const notice = document.getElementById("notice");
       const refreshBtn = document.getElementById("refreshBtn");
       const memberTbody = document.getElementById("memberTbody");
+      const groupSelect = document.getElementById("groupSelect");
+      const roleHint = document.getElementById("roleHint");
+      const memberFilter = document.getElementById("memberFilter");
+      const memberCountPill = document.getElementById("memberCountPill");
+
+      const addUserId = document.getElementById("addUserId");
+      const addRole = document.getElementById("addRole");
+      const addCanManage = document.getElementById("addCanManage");
+      const addBtn = document.getElementById("addBtn");
 
       const targetHint = document.getElementById("targetHint");
       const loadHealthBtn = document.getElementById("loadHealthBtn");
       const loadChallengeBtn = document.getElementById("loadChallengeBtn");
       const healthTbody = document.getElementById("healthTbody");
       const challengeTbody = document.getElementById("challengeTbody");
+      const tabHealth = document.getElementById("tabHealth");
+      const tabChallenge = document.getElementById("tabChallenge");
+      const healthPanel = document.getElementById("healthPanel");
+      const challengePanel = document.getElementById("challengePanel");
+      const healthHint = document.getElementById("healthHint");
+      const challengeHint = document.getElementById("challengeHint");
 
       let targetUserId = null;
+      let allMembers = [];
+      let selectedGroupId = null;
+      let selectedGroupName = null;
 
       function show(msg, kind) {
         notice.style.display = "block";
@@ -94,26 +171,77 @@
         const viewerUserId = userIdOrRedirect();
         if (!viewerUserId) return;
         const res = await api.family.members(viewerUserId);
-        const items = res.items || [];
-        if (items.length === 0) {
+        allMembers = res.items || [];
+        if (allMembers.length === 0) {
           memberTbody.innerHTML = "";
           show("当前账号不在任何家庭组中。", "error");
           return;
         }
-        memberTbody.innerHTML = items.map(m => `
+        renderGroups(viewerUserId);
+      }
+
+      function renderGroups(viewerUserId) {
+        const groups = new Map(); // id -> name
+        for (const m of allMembers) {
+          groups.set(m.familyGroupId, m.groupName || `组#${m.familyGroupId}`);
+        }
+        const options = Array.from(groups.entries()).map(([id, name]) => ({ id, name }));
+        if (!selectedGroupId && options.length > 0) {
+          selectedGroupId = options[0].id;
+          selectedGroupName = options[0].name;
+        }
+        groupSelect.innerHTML = options.map(g => `<option value="${g.id}" ${Number(g.id) === Number(selectedGroupId) ? "selected" : ""}>${g.name}</option>`).join("");
+        renderMemberList(viewerUserId);
+      }
+
+      function renderMemberList(viewerUserId) {
+        const groupId = Number(groupSelect.value || selectedGroupId);
+        selectedGroupId = groupId;
+        const groupName = groupSelect.options[groupSelect.selectedIndex]?.textContent || `组#${groupId}`;
+        selectedGroupName = groupName;
+
+        const keyword = (memberFilter.value || "").trim().toLowerCase();
+        const membersRaw = allMembers.filter(m => Number(m.familyGroupId) === groupId);
+        const members = keyword
+          ? membersRaw.filter(m =>
+              String(m.userId).includes(keyword) ||
+              (m.fullName || "").toLowerCase().includes(keyword) ||
+              (m.healthId || "").toLowerCase().includes(keyword)
+            )
+          : membersRaw;
+
+        memberCountPill.textContent = `${membersRaw.length} 人`;
+        const me = members.find(m => Number(m.userId) === Number(viewerUserId));
+        const isOwner = (me?.memberRole || "").toUpperCase() === "OWNER";
+        roleHint.textContent = me ? `你在该家庭组的角色：${me.memberRole}${me.canManage ? "（可管理）" : ""}` : "";
+        addBtn.disabled = !isOwner;
+        if (!isOwner) {
+          addBtn.textContent = "仅 OWNER 可添加";
+        } else {
+          addBtn.textContent = "添加成员";
+        }
+
+        memberTbody.innerHTML = members.map(m => `
           <tr>
             <td>${m.fullName}（userId=${m.userId}）</td>
-            <td>${m.groupName || ("组#" + m.familyGroupId)}</td>
-            <td class="td-actions"><button class="btn" data-uid="${m.userId}" data-name="${encodeURIComponent(m.fullName)}">选择</button></td>
+            <td class="td-actions">
+              <button class="btn" data-uid="${m.userId}" data-name="${encodeURIComponent(m.fullName)}">选择</button>
+            </td>
           </tr>
         `).join("");
+
         memberTbody.querySelectorAll("button[data-uid]").forEach(btn => {
           btn.addEventListener("click", () => {
             targetUserId = Number(btn.dataset.uid);
             const name = decodeURIComponent(btn.dataset.name);
-            targetHint.textContent = `已选择：${name}（userId=${targetUserId}）`;
+            targetHint.textContent = `已选择：${name}（userId=${targetUserId}，${selectedGroupName}）`;
             healthTbody.innerHTML = "";
             challengeTbody.innerHTML = "";
+            healthHint.textContent = "正在加载…";
+            challengeHint.textContent = "正在加载…";
+            // auto-load both panels once a member is selected
+            loadHealth().catch(() => {});
+            loadChallenges().catch(() => {});
           });
         });
       }
@@ -132,6 +260,7 @@
             <td>${r.note || ""}</td>
           </tr>
         `).join("");
+        healthHint.textContent = `已加载 ${rows.length} 条记录。`;
       }
 
       async function loadChallenges() {
@@ -148,10 +277,61 @@
             <td>${r.isCompleted ? "是" : "否"}</td>
           </tr>
         `).join("");
+        challengeHint.textContent = `已加载 ${rows.length} 条挑战。`;
       }
 
       refreshBtn.addEventListener("click", async () => {
         try { await refreshMembers(); show("已刷新成员列表。", "ok"); } catch (e) { show(e.message, "error"); }
+      });
+      memberFilter.addEventListener("input", () => {
+        const viewerUserId = userIdOrRedirect();
+        if (!viewerUserId) return;
+        renderMemberList(viewerUserId);
+      });
+      groupSelect.addEventListener("change", () => {
+        const viewerUserId = userIdOrRedirect();
+        if (!viewerUserId) return;
+        renderMemberList(viewerUserId);
+      });
+
+      function setTab(which) {
+        if (which === "health") {
+          tabHealth.classList.add("active");
+          tabChallenge.classList.remove("active");
+          healthPanel.style.display = "";
+          challengePanel.style.display = "none";
+        } else {
+          tabChallenge.classList.add("active");
+          tabHealth.classList.remove("active");
+          challengePanel.style.display = "";
+          healthPanel.style.display = "none";
+        }
+      }
+      tabHealth.addEventListener("click", () => setTab("health"));
+      tabChallenge.addEventListener("click", () => setTab("challenge"));
+
+      addBtn.addEventListener("click", async () => {
+        const actorUserId = userIdOrRedirect();
+        if (!actorUserId) return;
+        const familyGroupId = Number(groupSelect.value);
+        const target = Number(addUserId.value);
+        if (!familyGroupId) return show("请选择家庭组。", "error");
+        if (!target) return show("请输入新成员 userId。", "error");
+        try {
+          await api.family.addMember({
+            actorUserId,
+            familyGroupId,
+            targetUserId: target,
+            memberRole: addRole.value,
+            canManage: !!addCanManage.checked,
+          });
+          addUserId.value = "";
+          addCanManage.checked = false;
+          await refreshMembers();
+          show("已添加成员。", "ok");
+        } catch (e) {
+          show(e.message, "error");
+        }
       });
       loadHealthBtn.addEventListener("click", async () => {
         try { await loadHealth(); show("已加载健康记录。", "ok"); } catch (e) { show(e.message, "error"); }
@@ -171,5 +351,6 @@
     </script>
   </body>
 </html>
+
 
 

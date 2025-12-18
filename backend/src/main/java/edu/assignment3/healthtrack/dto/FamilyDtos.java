@@ -47,6 +47,15 @@ public final class FamilyDtos {
       @NotNull Long viewerUserId,
       @NotNull Long targetUserId
   ) {}
+
+  public record AddMemberRequest(
+      @NotNull Long actorUserId,
+      @NotNull Long familyGroupId,
+      @NotNull Long targetUserId,
+      String memberRole,     // OWNER / MEMBER / MANAGER (default MEMBER)
+      Boolean canManage      // default false
+  ) {}
 }
+
 
 

@@ -50,6 +50,43 @@ body {
   padding: 16px;
 }
 
+.panel.compact {
+  padding: 12px;
+}
+
+.section-title {
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.tabs {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.tab {
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(255,255,255,0.04);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 13px;
+}
+.tab:last-child { border-right: none; }
+.tab.active {
+  background: rgba(79, 124, 255, 0.22);
+  border-color: rgba(79,124,255,0.45);
+  color: var(--text);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);

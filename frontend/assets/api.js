@@ -108,6 +108,7 @@ export const api = {
     members: (userId) => request(`/family/${userId}/members`),
     memberHealthRecords: (payload, limit = 50) => request(`/family/member/health-records?limit=${limit}`, { method: "POST", body: payload }),
     memberChallenges: (payload) => request(`/family/member/challenges`, { method: "POST", body: payload }),
+    addMember: (payload) => request(`/family/group/add-member`, { method: "POST", body: payload }),
   },
 };
 

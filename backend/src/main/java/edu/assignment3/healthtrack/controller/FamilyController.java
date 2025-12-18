@@ -31,6 +31,12 @@ public class FamilyController {
   public FamilyDtos.MemberChallengeListResponse memberChallenges(@Valid @RequestBody FamilyDtos.MemberDataRequest req) {
     return service.memberChallenges(req.viewerUserId(), req.targetUserId());
   }
+
+  @PostMapping("/group/add-member")
+  public void addMember(@Valid @RequestBody FamilyDtos.AddMemberRequest req) {
+    service.addMember(req);
+  }
 }
+
 
 

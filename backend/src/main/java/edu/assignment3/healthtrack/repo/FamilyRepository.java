@@ -114,6 +114,52 @@ public class FamilyRepository {
         targetUserId
     );
   }
+
+  public MemberAuth getMemberAuth(long userId, long familyGroupId) {
+    return jdbc.query(
+        """
+        SELECT member_role, can_manage
+        FROM family_group_member
+        WHERE family_group_id = ?
+          AND user_id = ?
+        """,
+        rs -> rs.next()
+            ? new MemberAuth(rs.getString("member_role"), rs.getBoolean("can_manage"))
+            : null,
+        familyGroupId, userId
+    );
+  }
+
+  public boolean isMember(long userId, long familyGroupId) {
+    Integer v = jdbc.query(
+        "SELECT 1 FROM family_group_member WHERE family_group_id=? AND user_id=? LIMIT 1",
+        rs -> rs.next() ? 1 : null,
+        familyGroupId, userId
+    );
+    return v != null;
+  }
+
+  public boolean userExists(long userId) {
+    Integer v = jdbc.query(
+        "SELECT 1 FROM user_account WHERE id=? LIMIT 1",
+        rs -> rs.next() ? 1 : null,
+        userId
+    );
+    return v != null;
+  }
+
+  public void addMember(long familyGroupId, long targetUserId, String memberRole, boolean canManage) {
+    jdbc.update(
+        """
+        INSERT INTO family_group_member (family_group_id, user_id, member_role, can_manage)
+        VALUES (?, ?, ?, ?)
+        """,
+        familyGroupId, targetUserId, memberRole, canManage
+    );
+  }
+
+  public record MemberAuth(String memberRole, boolean canManage) {}
 }
+
 
 
